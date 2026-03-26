@@ -1,0 +1,79 @@
+name: Build Android Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install @capacitor/android
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync Capacitor with Android
+        run: npx cap sync android
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Setup Signing Key
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/my-release-key.keystore
+            echo "storeFile=my-release-key.keystore" > android/keystore.properties
+            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/keystore.properties
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
+          fi
+
+      - name: Build Release APK
+        run: |
+          cd android
+          if [ -f "keystore.properties" ]; then
+            ./gradlew assembleRelease --stacktrace
+          else
+            ./gradlew assembleRelease --stacktrace -Pandroid.injected.signing.store.file= -Pandroid.injected.signing.store.password= -Pandroid.injected.signing.key.alias= -Pandroid.injected.signing.key.password=
+          fi
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          files: android/app/build/outputs/apk/release/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
