@@ -15,7 +15,6 @@
   "author": "Toko Service HP",
   "license": "MIT",
   "dependencies": {
-    "@capacitor-community/bluetooth-serial": "^4.0.0",
     "@capacitor-community/contacts": "^6.0.0",
     "@capacitor/android": "^6.1.0",
     "@capacitor/app": "^6.0.0",
