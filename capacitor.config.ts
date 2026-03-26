@@ -1,4 +1,3 @@
-// capacitor.config.ts
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
@@ -9,13 +8,23 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     cleartext: true
   },
+  android: {
+    permissions: [
+      "android.permission.READ_CONTACTS",
+      "android.permission.WRITE_CONTACTS",
+      "android.permission.CAMERA",
+      "android.permission.BLUETOOTH",
+      "android.permission.BLUETOOTH_ADMIN",
+      "android.permission.BLUETOOTH_SCAN",
+      "android.permission.BLUETOOTH_CONNECT",
+      "android.permission.ACCESS_FINE_LOCATION"
+    ]
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 3000,
       launchAutoHide: true,
-      backgroundColor: '#667eea',
-      androidSplashResourceName: 'splash',
-      androidScaleType: 'CENTER_CROP'
+      backgroundColor: '#667eea'
     },
     StatusBar: {
       style: 'LIGHT',
