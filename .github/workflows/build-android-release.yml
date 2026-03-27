@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,7 +18,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install dependencies
         run: |
@@ -27,8 +27,43 @@ jobs:
       - name: Build web assets
         run: npm run build
 
+      - name: Add Android platform
+        run: npx cap add android
+
       - name: Sync Capacitor with Android
         run: npx cap sync android
+
+      - name: Setup Android permissions
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          
+          add_permission() {
+            local perm="$1"
+            if ! grep -q "android:name=\"$perm\"" "$MANIFEST"; then
+              sed -i "/<\/manifest>/i\    <uses-permission android:name=\"$perm\" />" "$MANIFEST"
+            fi
+          }
+          
+          add_permission_limited() {
+            local perm="$1"
+            local maxsdk="$2"
+            if ! grep -q "android:name=\"$perm\"" "$MANIFEST"; then
+              sed -i "/<\/manifest>/i\    <uses-permission android:name=\"$perm\" android:maxSdkVersion=\"$maxsdk\" />" "$MANIFEST"
+            fi
+          }
+          
+          add_permission "android.permission.READ_CONTACTS"
+          add_permission "android.permission.WRITE_CONTACTS"
+          add_permission "android.permission.CAMERA"
+          add_permission_limited "android.permission.BLUETOOTH" "30"
+          add_permission_limited "android.permission.BLUETOOTH_ADMIN" "30"
+          add_permission "android.permission.BLUETOOTH_SCAN"
+          add_permission "android.permission.BLUETOOTH_CONNECT"
+          add_permission "android.permission.BLUETOOTH_ADVERTISE"
+          add_permission "android.permission.ACCESS_FINE_LOCATION"
+          add_permission "android.permission.ACCESS_COARSE_LOCATION"
+          add_permission "android.permission.INTERNET"
+          add_permission "android.permission.ACCESS_NETWORK_STATE"
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -39,41 +74,42 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Setup signing
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            cat > android/key.properties << EOF
+            storePassword=${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+            keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
+            keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
+            storeFile=release.keystore
+            EOF
+            echo "✅ Release signing configured"
+          fi
+
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
-
-      - name: Setup Signing Key
-        run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/my-release-key.keystore
-            echo "storeFile=my-release-key.keystore" > android/keystore.properties
-            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/keystore.properties
-            echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
-            echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
-          fi
 
       - name: Build Release APK
         run: |
           cd android
-          if [ -f "keystore.properties" ]; then
-            ./gradlew assembleRelease --stacktrace
-          else
-            ./gradlew assembleRelease --stacktrace -Pandroid.injected.signing.store.file= -Pandroid.injected.signing.store.password= -Pandroid.injected.signing.key.alias= -Pandroid.injected.signing.key.password=
-          fi
+          ./gradlew assembleRelease --stacktrace
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 90
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          files: android/app/build/outputs/apk/release/*.apk
-          draft: false
-          prerelease: false
+          files: android/app/build/outputs/apk/release/app-release.apk
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
