@@ -34,6 +34,20 @@ jobs:
       - name: Sync Capacitor with Android
         run: npx cap sync android
 
+      - name: Tambahkan izin READ_CONTACTS dan WRITE_CONTACTS ke AndroidManifest.xml
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            if ! grep -q "android.permission.READ_CONTACTS" "$MANIFEST"; then
+              sed -i '/<manifest/a\    <uses-permission android:name="android.permission.READ_CONTACTS" />\n    <uses-permission android:name="android.permission.WRITE_CONTACTS" />' "$MANIFEST"
+              echo "✅ Izin kontak ditambahkan"
+            else
+              echo "✅ Izin kontak sudah ada"
+            fi
+          else
+            echo "⚠️ AndroidManifest.xml tidak ditemukan"
+          fi
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
