@@ -22,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install
+          npm ci
           npm install @capacitor/android
 
       - name: Build web assets
@@ -34,19 +34,61 @@ jobs:
       - name: Sync Capacitor with Android
         run: npx cap sync android
 
-      - name: Tambahkan izin READ_CONTACTS dan WRITE_CONTACTS ke AndroidManifest.xml
+      - name: Setup Android permissions
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
-          if [ -f "$MANIFEST" ]; then
-            if ! grep -q "android.permission.READ_CONTACTS" "$MANIFEST"; then
-              sed -i '/<manifest/a\    <uses-permission android:name="android.permission.READ_CONTACTS" />\n    <uses-permission android:name="android.permission.WRITE_CONTACTS" />' "$MANIFEST"
-              echo "✅ Izin kontak ditambahkan"
-            else
-              echo "✅ Izin kontak sudah ada"
+          
+          for i in {1..10}; do
+            if [ -f "$MANIFEST" ]; then
+              echo "✅ Manifest ditemukan setelah $i detik"
+              break
             fi
-          else
-            echo "⚠️ AndroidManifest.xml tidak ditemukan"
+            sleep 1
+          done
+          
+          if [ ! -f "$MANIFEST" ]; then
+            echo "❌ AndroidManifest.xml tidak ditemukan!"
+            find android -name "*.xml" 2>/dev/null | head -5
+            exit 1
           fi
+          
+          cp "$MANIFEST" "$MANIFEST.bak"
+          
+          add_permission() {
+            local perm="$1"
+            if ! grep -q "android:name=\"$perm\"" "$MANIFEST"; then
+              sed -i "/<\/manifest>/i\    <uses-permission android:name=\"$perm\" />" "$MANIFEST"
+              echo "✅ + $perm"
+            else
+              echo "ℹ️  = $perm (sudah ada)"
+            fi
+          }
+          
+          add_permission_limited() {
+            local perm="$1"
+            local maxsdk="$2"
+            if ! grep -q "android:name=\"$perm\"" "$MANIFEST"; then
+              sed -i "/<\/manifest>/i\    <uses-permission android:name=\"$perm\" android:maxSdkVersion=\"$maxsdk\" />" "$MANIFEST"
+              echo "✅ + $perm (maxSdk: $maxsdk)"
+            else
+              echo "ℹ️  = $perm (sudah ada)"
+            fi
+          }
+          
+          echo "🔧 Menambahkan permissions..."
+          
+          add_permission "android.permission.READ_CONTACTS"
+          add_permission "android.permission.WRITE_CONTACTS"
+          add_permission "android.permission.CAMERA"
+          add_permission_limited "android.permission.BLUETOOTH" "30"
+          add_permission_limited "android.permission.BLUETOOTH_ADMIN" "30"
+          add_permission "android.permission.BLUETOOTH_SCAN"
+          add_permission "android.permission.BLUETOOTH_CONNECT"
+          add_permission "android.permission.BLUETOOTH_ADVERTISE"
+          add_permission "android.permission.ACCESS_FINE_LOCATION"
+          add_permission "android.permission.ACCESS_COARSE_LOCATION"
+          add_permission "android.permission.INTERNET"
+          add_permission "android.permission.ACCESS_NETWORK_STATE"
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -65,9 +107,22 @@ jobs:
           cd android
           ./gradlew assembleDebug --stacktrace
 
+      - name: Verify APK exists
+        run: |
+          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ -f "$APK_PATH" ]; then
+            echo "✅ APK ditemukan: $APK_PATH"
+            ls -lh "$APK_PATH"
+          else
+            echo "❌ APK tidak ditemukan!"
+            find android -name "*.apk" 2>/dev/null
+            exit 1
+          fi
+
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 30
