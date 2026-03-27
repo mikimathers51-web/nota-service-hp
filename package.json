@@ -4,12 +4,14 @@
   "description": "Aplikasi Nota Service HP dengan Capacitor",
   "main": "index.js",
   "scripts": {
-    "build": "node scripts/build.js",
+    "build": "node build.js",
     "sync": "npx cap sync",
     "android": "npx cap open android",
     "add-android": "npx cap add android",
     "build-android": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
-    "build-release": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease"
+    "build-release": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease",
+    "clean": "rm -rf dist android ios",
+    "lint": "tsc --noEmit"
   },
   "keywords": ["capacitor", "mobile", "android", "service", "nota", "hp"],
   "author": "Toko Service HP",
@@ -29,5 +31,8 @@
   "devDependencies": {
     "@capacitor/cli": "^6.1.0",
     "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
