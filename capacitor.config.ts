@@ -9,16 +9,10 @@ const config: CapacitorConfig = {
     cleartext: true
   },
   android: {
-    permissions: [
-      "android.permission.READ_CONTACTS",
-      "android.permission.WRITE_CONTACTS",
-      "android.permission.CAMERA",
-      "android.permission.BLUETOOTH",
-      "android.permission.BLUETOOTH_ADMIN",
-      "android.permission.BLUETOOTH_SCAN",
-      "android.permission.BLUETOOTH_CONNECT",
-      "android.permission.ACCESS_FINE_LOCATION"
-    ]
+    buildOptions: {
+      keystorePath: undefined,
+      keystoreAlias: undefined,
+    }
   },
   plugins: {
     SplashScreen: {
